@@ -1,0 +1,585 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== المحاسبة ====================
+
+model Account {
+  id             String             @id @default(cuid())
+  code           String             @unique
+  name           String
+  type           String // ASSET | LIABILITY | EQUITY | REVENUE | EXPENSE
+  nature         String // DEBIT | CREDIT
+  isSystem       Boolean            @default(false)
+  isActive       Boolean            @default(true)
+  openingBalance Float              @default(0)
+  parentId       String?
+  parent         Account?           @relation("AccountTree", fields: [parentId], references: [id])
+  children       Account[]          @relation("AccountTree")
+  journalLines   JournalEntryLine[]
+  partner        Partner[] // الحسابات الفرعية لملفات العملاء والموردين — تعدد الأدوار: الحساب الواحد يحمل ملف عميل وملف مورد معاً
+  employee       Employee? // الحساب الفرعي لملف موظف — مزامنة شجرة الحسابات مع قائمة الموظفين
+  payments       Payment[] // سندات الدفع المرتبطة بحساب مصروف مباشرة (بدون طرف)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  @@index([parentId]) // P1: الشجرة تُمشى كثيراً من الأب للأبناء
+}
+
+model CostCenter {
+  id           String             @id @default(cuid())
+  code         String             @unique
+  name         String
+  isActive     Boolean            @default(true)
+  journalLines JournalEntryLine[]
+  invoices     Invoice[] // فواتير نُسب قيدها الآلي لهذا المركز
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+}
+
+model JournalEntry {
+  id          String             @id @default(cuid())
+  number      String             @unique
+  date        DateTime
+  description String
+  source      String             @default("MANUAL") // MANUAL | SALES | PURCHASE | RECEIPT | PAYMENT | SALARY | EXPENSE | OPENING
+  status      String             @default("DRAFT") // DRAFT | POSTED | CANCELLED
+  totalDebit  Float              @default(0)
+  totalCredit Float              @default(0)
+  refType     String? // ربط القيد بمصدره الآلي — INVOICE لقيود الفواتير التلقائية
+  refId       String? // معرف المستند المصدر (id الفاتورة)
+  lines       JournalEntryLine[]
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  @@index([date])
+  @@index([status])
+  @@index([refType, refId])
+}
+
+model JournalEntryLine {
+  id           String       @id @default(cuid())
+  entryId      String
+  entry        JournalEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  accountId    String
+  account      Account      @relation(fields: [accountId], references: [id])
+  costCenterId String?
+  costCenter   CostCenter?  @relation(fields: [costCenterId], references: [id])
+  debit        Float        @default(0)
+  credit       Float        @default(0)
+  description  String?
+  order        Int          @default(0)
+
+  @@index([entryId])
+  @@index([accountId])
+  @@index([costCenterId]) // P1: تقارير مراكز التكلفة
+}
+
+// ==================== المخزون ====================
+
+model Warehouse {
+  id           String          @id @default(cuid())
+  code         String          @unique
+  name         String
+  level        Int             @default(1) // 1=الشامل | 2=مستودع مدينة | 3=مستودع أقسام | 4=قسم
+  keeperName   String? // أمين المستودع (إلزامي في التحقق)
+  keeperPhone  String?
+  location     String?
+  notes        String?
+  isActive     Boolean         @default(true)
+  parentId     String?
+  parent       Warehouse?      @relation("WarehouseTree", fields: [parentId], references: [id])
+  children     Warehouse[]     @relation("WarehouseTree")
+  items        Item[]
+  itemBalances ItemBalance[]
+  movements    StockMovement[]
+  stocktakings Stocktaking[]
+  invoiceLines InvoiceLine[]
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+}
+
+model ItemGroup {
+  id    String @id @default(cuid())
+  code  String @unique
+  name  String
+  items Item[]
+}
+
+model Item {
+  id               String            @id @default(cuid())
+  code             String            @unique // رقم البطاقة — ترقيم تلقائي I-001 ثم +1
+  name             String
+  barcode          String?           @unique // رمز الباركود — كتابة أو قراءة من صورة أو مسح كاميرا
+  unit             String? // (ملغى) حُذفت «الوحدة الأساسية» من البطاقة — العميل للتوافق فقط
+  description      String?
+  purchasePrice    Float             @default(0) // آخر سعر شراء — يُغذَّى ذرياً من كل فاتورة مشتريات (للعرض والتقدير)
+  // التكلفة الوسطية المرجحة اللحظية — المصدر الوحيد لتكلفة المبيعات وتقييم المخزون
+  // (القسم 4.2). تُحدَّث داخل معاملة كل حركة دخول: شراء أو مردود شراء أو تعديل/حذف
+  // فاتورة شراء. تعيش على المادة لا في بنود الفواتير، فتبقى صحيحة بعد تدوير الفترة
+  // الذي ينقل كل الفواتير إلى الأرشيف — وهذا سبب انهيار التكلفة إلى صفر قبل إصلاحها.
+  avgCost          Float             @default(0)
+  salePrice        Float             @default(0)
+  taxRate          Float             @default(0) // نسبة الضريبة % عند التسعير
+  minStock         Float             @default(0) // الحد الأدنى
+  maxStock         Float             @default(0) // الحد الأعلى
+  location         String? // مكان التواجد داخل القسم (رف/ممر/تفاصيل)
+  isActive         Boolean           @default(true)
+  groupId          String?
+  group            ItemGroup?        @relation(fields: [groupId], references: [id])
+  warehouseId      String?
+  warehouse        Warehouse?        @relation(fields: [warehouseId], references: [id])
+  images           ItemImage[]
+  units            ItemUnit[]
+  balances         ItemBalance[]
+  movements        StockMovement[]
+  invoiceLines     InvoiceLine[]
+  stocktakingLines StocktakingLine[]
+  bundleItems      BundleItem[] // بنود سلال العروض التي تضم هذه المادة
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  @@index([warehouseId])
+}
+
+// صور المادة — بحد 10 صور مع صورة أساسية ترافق المادة في كل الجداول (عدا الطباعة)
+model ItemImage {
+  id        String  @id @default(cuid())
+  itemId    String
+  item      Item    @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  url       String // /api/files/<name>
+  fileName  String
+  sortOrder Int     @default(0)
+  isPrimary Boolean @default(false)
+
+  @@index([itemId])
+}
+
+// وحدات المادة الإضافية — الوحدة الأساسية حقل unit على Item
+model ItemUnit {
+  id       String  @id @default(cuid())
+  itemId   String
+  item     Item    @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  name     String
+  factor   Float   @default(1) // معامل التحويل إلى الوحدة الأساسية
+  barcode  String?
+  isActive Boolean @default(true)
+
+  @@index([itemId])
+}
+
+model ItemBalance {
+  id          String    @id @default(cuid())
+  itemId      String
+  item        Item      @relation(fields: [itemId], references: [id])
+  warehouseId String
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id])
+  quantity    Float     @default(0)
+
+  @@unique([itemId, warehouseId])
+}
+
+model StockMovement {
+  id          String    @id @default(cuid())
+  date        DateTime
+  type        String // IN | OUT | TRANSFER
+  itemId      String
+  item        Item      @relation(fields: [itemId], references: [id])
+  warehouseId String
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id])
+  quantity    Float
+  unitCost    Float     @default(0)
+  reason      String?
+  refType     String? // INVOICE | MANUAL | STOCKTAKING | DAMAGE | TRANSFER (التحويل صفّان مترابطان بنفس refId)
+  refId       String?
+  createdAt   DateTime  @default(now())
+
+  @@index([itemId])
+  @@index([warehouseId])
+  @@index([date])
+  @@index([refType, refId])
+}
+
+// ==================== سلال العروض الذكية ====================
+// قوالب العروض الترويجية — تُحفظ وتُعاد استخدامها وتُعدَّل، مع إمكانية حفظ التعديل
+// كنموذج جديد باسم مختلف. ثلاثة أنواع: GIFT (سلة مواد مع صنف هدية) |
+// PERCENT (خصم نسبة من قيمة السلة) | PRICE (سعر مبيعات مخفض لكل مادة)
+model Bundle {
+  id              String       @id @default(cuid())
+  name            String       @unique
+  type            String // GIFT | PERCENT | PRICE
+  discountPercent Float        @default(0) // نسبة الحسم — للنوع PERCENT حصراً
+  startsAt        DateTime // بداية فترة النشاط (تاريخ ووقت)
+  endsAt          DateTime // نهاية فترة النشاط (تاريخ ووقت)
+  totalSales      Float        @default(0) // إجمالي المبيعات — قيمة بنود السلة بالأسعار الأصلية عبر الفواتير
+  saleCount       Int          @default(0) // عدد مرات البيع — عدد الفواتير التي استعملت السلة
+  totalDiscount   Float        @default(0) // إجمالي الحسومات — ما مُنح من حسم بسبب السلة
+  enabled         Boolean      @default(true) // مفتاح التفعيل اليدوي — الإيقاف يخفي السلة عن الفواتير بغض النظر عن الفترة (Task 36)
+  items           BundleItem[]
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([startsAt, endsAt]) // فحص السلال النشطة عند فتح فواتير البيع
+}
+
+// بنود السلة — المواد المجمعة في العرض الواحد
+model BundleItem {
+  id          String  @id @default(cuid())
+  bundleId    String
+  bundle      Bundle  @relation(fields: [bundleId], references: [id], onDelete: Cascade)
+  itemId      String
+  item        Item    @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  quantity    Float // الكمية المطلوبة من المادة داخل السلة
+  isGift      Boolean @default(false) // مادة الهدية — للنوع GIFT (واحدة حصراً تُحسم قيمتها كاملة)
+  bundlePrice Float   @default(0) // السعر المخفض الجديد — للنوع PRICE
+
+  @@index([bundleId])
+  @@index([itemId])
+}
+
+model Stocktaking {
+  id          String            @id @default(cuid())
+  number      String            @unique
+  date        DateTime
+  warehouseId String
+  warehouse   Warehouse         @relation(fields: [warehouseId], references: [id])
+  status      String            @default("DRAFT") // DRAFT | POSTED
+  notes       String?
+  lines       StocktakingLine[]
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@index([warehouseId])
+  @@index([date])
+}
+
+model StocktakingLine {
+  id            String      @id @default(cuid())
+  stocktakingId String
+  stocktaking   Stocktaking @relation(fields: [stocktakingId], references: [id], onDelete: Cascade)
+  itemId        String
+  item          Item        @relation(fields: [itemId], references: [id])
+  systemQty     Float
+  countedQty    Float
+  difference    Float
+
+  @@index([stocktakingId])
+  @@index([itemId])
+}
+
+// ==================== التجارية ====================
+
+model Partner {
+  id        String    @id @default(cuid())
+  code      String    @unique
+  name      String
+  type      String // CUSTOMER | SUPPLIER
+  phone     String?
+  address   String?
+  notes     String?
+  isActive  Boolean   @default(true)
+  accountId String? // الحساب الفرعي في شجرة الحسابات — تعدد الأدوار: نفس الحساب يحمل ملف عميل وملف مورد معاً (مورد يصبح عميلاً وبالعكس)
+  account   Account?  @relation(fields: [accountId], references: [id])
+  invoices  Invoice[]
+  payments  Payment[]
+  loyaltyTransactions LoyaltyTransaction[] // كشف حساب نقاط الولاء الكامل للعميل
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@unique([accountId, type]) // حساب واحد + دور واحد = ملف واحد — عميل ومورد على الحساب نفسه مسموحان
+  @@index([type])
+}
+
+model Invoice {
+  id           String        @id @default(cuid())
+  number       String        @unique
+  type         String // SALE | SALES_RETURN | PURCHASE | PURCHASE_RETURN
+  date         DateTime
+  partnerId    String
+  partner      Partner       @relation(fields: [partnerId], references: [id])
+  subtotal     Float         @default(0)
+  discount     Float         @default(0) // حسم ممنوح (بيع/مردود بيع) أو حسم مكتسب (شراء/مردود شراء)
+  taxRate      Float         @default(0) // نسبة الضريبة % على مستوى الفاتورة
+  tax          Float         @default(0)
+  total        Float         @default(0)
+  paid         Float         @default(0)
+  status       String        @default("UNPAID") // PAID | PARTIAL | UNPAID
+  costCenterId String? // مركز التكلفة المختار — يُنسب إليه القيد المحاسبي التلقائي كاملاً
+  costCenter   CostCenter?   @relation(fields: [costCenterId], references: [id])
+  notes        String?
+  isDeleted    Boolean       @default(false) // حذف ناعم — الرقم يُحجز بلاحقة xx فلا يُعاد لأي فاتورة جديدة
+  deletedAt    DateTime?
+  // نقاط الولاء — لقطة دائمة لأثر الفاتورة على رصيد نقاط العميل (التعديل والحذف يعكسانها ذرياً)
+  loyaltyPointsEarned   Int   @default(0) // النقاط الممنوحة آلياً لهذه الفاتورة عند ترحيلها
+  loyaltyPointsRedeemed Int   @default(0) // النقاط التي استردها العميل داخل الفاتورة كحسم
+  loyaltyRedeemValue    Float @default(0) // القيمة المالية للاسترداد — جزء من الحسم الكلي يُرحّل إلى 4110
+  lines        InvoiceLine[]
+  payments     Payment[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([date])
+  @@index([partnerId])
+  @@index([type])
+  @@index([isDeleted])
+  @@index([status]) // P1: فلاتر الحالة في التقارير واللوحة
+  @@index([costCenterId])
+}
+
+model InvoiceLine {
+  id             String     @id @default(cuid())
+  invoiceId      String
+  invoice        Invoice    @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  itemId         String
+  item           Item       @relation(fields: [itemId], references: [id])
+  warehouseId    String?
+  warehouse      Warehouse? @relation(fields: [warehouseId], references: [id])
+  unitName       String? // الوحدة المعتمدة في البند (للعرض — الوحدات متساوية في النظام)
+  unitFactor     Float      @default(1) // معامل الوحدة المختارة (للعرض)
+  quantity       Float
+  unitPrice      Float
+  total          Float
+  // سلال العروض — حقول نصية حرة بلا مفاتيح أجنبية كي تبقى فواتير التاريخ سليمة
+  // حتى بعد حذف قالب السلة، ويبقى مسمى السلة محفوظاً في كل حركة مخزون وعرض
+  bundleId       String? // معرف سلة العرض المصدر (نص حي)
+  bundleName     String? // اسم السلة لحظة البيع — لقطة دائمة للعرض والحركات
+  bundleDiscount Float      @default(0) // حسم هذه السطر الناتج عن السلة (معلومي — الحسم يُرحّل بحقل الفاتورة)
+  bundleQty      Float      @default(1) // عدد السلال التي يغطيها هذا السطر — العرض المجمل يقسم عليه (Task 36)
+  bundleGift     Boolean    @default(false) // هل كانت هذه المادة هدية السلة لحظة البيع — لقطة للملحق المطبوع (Task 36)
+
+  @@index([invoiceId])
+  @@index([itemId])
+  @@index([warehouseId])
+  @@index([bundleId]) // تتبع مبيعات كل سلة وتعديل إحصاءاتها عند تعديل/حذف الفواتير
+}
+
+model Payment {
+  id        String   @id @default(cuid())
+  number    String   @unique
+  type      String // RECEIPT | PAYMENT
+  date      DateTime
+  amount    Float
+  method    String // CASH | BANK | CHEQUE
+  partnerId String?
+  partner   Partner? @relation(fields: [partnerId], references: [id])
+  // وضع المصروف: سند دفع مُقيَّد على حساب مصروف من الدليل (5xxx) بدلاً من طرف — حصريان
+  accountId String?
+  account   Account? @relation(fields: [accountId], references: [id])
+  invoiceId String?
+  invoice   Invoice? @relation(fields: [invoiceId], references: [id])
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([type, date])
+  @@index([partnerId])
+  @@index([accountId]) // سندات مصروف على حساب معين
+  @@index([invoiceId]) // P1: سندات فاتورة معينة
+}
+
+// ==================== النظام ====================
+
+model User {
+  id                 String   @id @default(cuid())
+  username           String   @unique
+  name               String
+  role               String   @default("USER") // ADMIN | ACCOUNTANT | VIEWER
+  passwordHash       String? // scrypt — صيغة salt:hash بست عشرية (null = بلا كلمة مرور بعد)
+  isActive           Boolean  @default(true)
+  // P1-1: إصدار الجلسة — يتزايد عند التعطيل أو تغيير كلمة المرور فتسقط كل جلسات المستخدم فوراً
+  sessionVersion     Int      @default(1)
+  // P1-3: كلمة مرور افتراضية معروفة — يُجبر المستخدم على تغييرها قبل استخدام النظام
+  mustChangePassword Boolean  @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+model AuditLog {
+  id           String   @id @default(cuid())
+  action       String // CREATE | UPDATE | DELETE | SYSTEM
+  entity       String // INVOICE | PAYMENT | JOURNAL | SYSTEM … (قابل للتوسع)
+  entityId     String?
+  entityNumber String? // رقم المستند (بعد حذف فاتورة يُحفظ برقمه المحجوز xx)
+  title        String // عنوان مختصر: «فاتورة مبيعات INV-0012»
+  summary      String // وصف عربي كامل للحركة
+  details      String? // JSON بمفاتيح عربية — يُعرض في نافذة التفاصيل
+  amount       Float? // القيمة المالية الدالة إن وُجدت
+  createdAt    DateTime @default(now())
+
+  @@index([entity, createdAt])
+  @@index([action])
+  @@index([createdAt])
+}
+
+model Setting {
+  key   String @id
+  value String
+}
+
+// P1-5: حالة حد المحاولات — في القاعدة لا في الذاكرة (وضع التطوير يعزل السياقات،
+// والقاعدة تضمن العدّ الصحيح عبر العمليات وإعادة التشغيل كذلك)
+model RateLimitEntry {
+  key         String    @id // مثال: login:admin · login-ip:1.2.3.4 · chgpass:local · backup:<uid>
+  count       Int       @default(0)
+  windowStart DateTime  @default(now())
+  lockedUntil DateTime?
+  updatedAt   DateTime  @updatedAt
+}
+
+// ==================== الموارد البشرية ====================
+
+model Employee {
+  id          String           @id @default(cuid())
+  code        String           @unique
+  name        String
+  position    String
+  department  String?
+  phone       String?
+  hireDate    DateTime
+  baseSalary  Float
+  isActive    Boolean          @default(true)
+  accountId   String?          @unique // الحساب الفرعي في شجرة الحسابات — تحت حساب التحكم 1150 سلف الموظفين
+  account     Account?         @relation(fields: [accountId], references: [id])
+  salaries    Salary[]
+  advances    Advance[]
+  leaves      Leave[]
+  attendances Attendance[]
+  bonuses     BonusDeduction[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+model Salary {
+  id         String    @id @default(cuid())
+  employeeId String
+  employee   Employee  @relation(fields: [employeeId], references: [id])
+  month      String // 2026-01
+  base       Float
+  bonuses    Float     @default(0)
+  deductions Float     @default(0)
+  net        Float
+  status     String    @default("PENDING") // PENDING | PAID
+  paidAt     DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([employeeId]) // P1: جداول الموارد البشرية بلا فهرس موظف
+}
+
+model Advance {
+  id         String   @id @default(cuid())
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id])
+  date       DateTime
+  amount     Float
+  reason     String?
+  status     String   @default("UNPAID") // PAID | UNPAID | SETTLED
+  createdAt  DateTime @default(now())
+
+  @@index([employeeId]) // P1
+}
+
+model Leave {
+  id         String   @id @default(cuid())
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id])
+  type       String // ANNUAL | SICK | UNPAID | EMERGENCY
+  from       DateTime
+  to         DateTime
+  days       Int
+  reason     String?
+  status     String   @default("PENDING") // PENDING | APPROVED | REJECTED
+  createdAt  DateTime @default(now())
+
+  @@index([employeeId]) // P1
+}
+
+model Attendance {
+  id         String   @id @default(cuid())
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id])
+  date       DateTime
+  checkIn    String?
+  checkOut   String?
+  status     String   @default("PRESENT") // PRESENT | ABSENT | LATE | LEAVE
+
+  @@unique([employeeId, date])
+}
+
+model BonusDeduction {
+  id         String   @id @default(cuid())
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id])
+  type       String // BONUS | DEDUCTION
+  date       DateTime
+  amount     Float
+  reason     String?
+  createdAt  DateTime @default(now())
+
+  @@index([employeeId]) // P1
+}
+
+// ==================== نقاط الولاء الديناميكية ====================
+// إعدادات المنظومة — صف وحيد (id=1) يُنشأ تلقائياً عند أول قراءة ويُعدَّل من تبويب الإعدادات
+// المفتاح المركزي isEnabled يخفي مربع نقاط العميل من فواتير المبيعات ويوقف الاحتساب كلياً عند إلغائه
+model LoyaltySettings {
+  id                   Int      @id @default(autoincrement())
+  isEnabled            Boolean  @default(false) // مفتاح التنشيط المركزي للمنظومة كاملة
+  minInvoiceValue      Float    @default(100000) // الحد الأدنى لقيمة الفاتورة المؤهلة (ل.س) — ما دونها صفر نقاط ولا تجميع أبداً
+  cycleDays            Int      @default(7) // عدد أيام الدورة الأسبوعية (7 أيام — أسبوع كامل)
+  basePoints           Int      @default(20) // عدد النقاط الأساسية للمضاعف الأول (100,000–199,999)
+  pointPrice           Float    @default(1000) // سعر النقطة الواحدة (ل.س) — يتحول به الاسترداد إلى حسم مالي
+  multiplicationFactor Float    @default(1.0) // نسبة مضاعفة النقاط الأسبوعية (Multiplication Factor) — تُضرب بالنقاط النهائية لكل الجدول فور الحفظ (مثل 1.5 أو 2.0)
+  updatedAt            DateTime @updatedAt
+}
+
+// حركات نقاط الولاء — كل صف حركة موثقة في كشف حساب العميل
+// points موقّعة: (+) مضافة للرصيد — (−) مخصومة منه، وbalanceAfter لقطة الرصيد لحظة الحركة
+// الأنواع: EARN استحقاق آلي من فاتورة بيع | REDEEM استرداد كحسم داخل فاتورة |
+// CASHOUT صرف نقدي بسند دفع | GIFT إهداء يدوي/جماعي | DEDUCT خصم وحرمان يدوي/جماعي |
+// REVOKE عكس آلي بسبب تعديل/حذف الفاتورة المصدر
+model LoyaltyTransaction {
+  id           String   @id @default(cuid())
+  customerId   String
+  customer     Partner  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  type         String // EARN | REDEEM | CASHOUT | GIFT | DEDUCT | REVOKE
+  points       Int // موقعة دائماً — الاتجاه من إشارتها
+  balanceAfter Int // الرصيد المتبقي بعد هذه الحركة مباشرة
+  reason       String // البيان والسبب — إلزامي في كل الحركات
+  refType      String? // INVOICE | PAYMENT | MANUAL | BULK
+  refId        String? // معرف المستند المصدر
+  refNumber    String? // رقم الفاتورة أو السند — يظهر في عمود «رقم الفاتورة/السند» بالكشف
+  createdAt    DateTime @default(now())
+
+  @@index([customerId, createdAt])
+  @@index([type])
+  @@index([refType, refId])
+}
+
+// ==================== إقفال الفترة المحاسبية والتدوير ====================
+// عند الإقفال: تُلتقط نسخة أرشيفية كاملة (VACUUM INTO) للفترة المنتهية تُعرض للقراءة فقط،
+// ويُنشأ «سند قيد افتتاحي» يرحّل أرصدة كل الحسابات إلى الفترة الجديدة (مع إقفال نتيجة
+// الأرباح والخسائر إلى الأرباح المحتجزة)، وتُدوَّر القيود القديمة (تُحذف من القاعدة الحية
+// وتعيش في النسخة الأرشيفية). التراجع عن الإقفال يعيد النسخة الأرشيفية ويخسّر كل ما بعده.
+model PeriodClose {
+  id                   String   @id @default(cuid())
+  label                String   @unique // «السنة المالية 2025»
+  closingDate          DateTime // تاريخ الإقفال — آخر يوم في الفترة المقفلة (00:00:00.000Z)
+  openingDate          DateTime // أول يوم من الفترة الجديدة = الإقفال + 1
+  closingEntryId       String? // احتياطي — معرف قيد إقفال النتيجة إن أُنشئ منفصلاً
+  closingEntryNumber   String?
+  openingEntryId       String // معرف سند القيد الافتتاحي (JournalEntry — بلا علاقة FK لعزل الأرشفة)
+  openingEntryNumber   String
+  retainedEarningsCode String // كود حساب الأرباح المحتجزة الذي استُوعبت فيه نتيجة الفترة
+  snapshotFile         String // اسم ملف النسخة الأرشيفية داخل db/periods (basename فقط — بلا مسار)
+  snapshotBytes        Int      @default(0)
+  rotatedEntries       Int      @default(0) // عدد القيود التي دُوّرت (حُذفت من الحية وعاشت في الأرشيف)
+  closedBy             String // من نفّذ الإقفال (اسم المستخدم)
+  createdAt            DateTime @default(now())
+
+  @@index([closingDate])
+}

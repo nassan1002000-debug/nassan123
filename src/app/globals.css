@@ -1,0 +1,327 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-cairo);
+  --font-mono: var(--font-cairo);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root {
+  --radius: 0.625rem;
+  /* الوضع النهاري: Emerald/Slate مالي */
+  --background: oklch(0.98 0.003 180);
+  --foreground: oklch(0.23 0.02 240);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.23 0.02 240);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.23 0.02 240);
+  --primary: oklch(0.55 0.13 163);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.955 0.01 180);
+  --secondary-foreground: oklch(0.3 0.03 240);
+  --muted: oklch(0.955 0.008 180);
+  --muted-foreground: oklch(0.5 0.015 240);
+  --accent: oklch(0.94 0.03 166);
+  --accent-foreground: oklch(0.35 0.06 165);
+  --destructive: oklch(0.577 0.215 27.325);
+  --border: oklch(0.9 0.008 180);
+  --input: oklch(0.9 0.008 180);
+  --ring: oklch(0.55 0.13 163);
+  --chart-1: oklch(0.55 0.13 163);
+  --chart-2: oklch(0.7 0.13 180);
+  --chart-3: oklch(0.8 0.16 86);
+  --chart-4: oklch(0.62 0.19 20);
+  --chart-5: oklch(0.5 0.05 240);
+  --sidebar: oklch(0.24 0.025 165);
+  --sidebar-foreground: oklch(0.96 0.005 180);
+  --sidebar-primary: oklch(0.7 0.15 166);
+  --sidebar-primary-foreground: oklch(0.15 0.02 165);
+  --sidebar-accent: oklch(0.3 0.03 165);
+  --sidebar-accent-foreground: oklch(0.97 0.005 180);
+  --sidebar-border: oklch(0.35 0.03 165);
+  --sidebar-ring: oklch(0.6 0.12 166);
+}
+
+.dark {
+  /* الوضع الليلي: أسود وذهبي فاخر */
+  --background: oklch(0.135 0 0);
+  --foreground: oklch(0.93 0 0);
+  --card: oklch(0.17 0 0);
+  --card-foreground: oklch(0.93 0 0);
+  --popover: oklch(0.17 0 0);
+  --popover-foreground: oklch(0.93 0 0);
+  --primary: oklch(0.795 0.148 86);
+  --primary-foreground: oklch(0.18 0 0);
+  --secondary: oklch(0.22 0 0);
+  --secondary-foreground: oklch(0.93 0 0);
+  --muted: oklch(0.22 0 0);
+  --muted-foreground: oklch(0.62 0 0);
+  --accent: oklch(0.25 0.02 86);
+  --accent-foreground: oklch(0.88 0.09 86);
+  --destructive: oklch(0.62 0.19 25);
+  --border: oklch(0.28 0 0);
+  --input: oklch(0.28 0 0);
+  --ring: oklch(0.795 0.148 86);
+  --chart-1: oklch(0.795 0.148 86);
+  --chart-2: oklch(0.72 0.13 165);
+  --chart-3: oklch(0.65 0.19 20);
+  --chart-4: oklch(0.75 0.1 220);
+  --chart-5: oklch(0.68 0.16 55);
+  --sidebar: oklch(0.155 0 0);
+  --sidebar-foreground: oklch(0.93 0 0);
+  --sidebar-primary: oklch(0.795 0.148 86);
+  --sidebar-primary-foreground: oklch(0.18 0 0);
+  --sidebar-accent: oklch(0.23 0.015 86);
+  --sidebar-accent-foreground: oklch(0.95 0.05 90);
+  --sidebar-border: oklch(0.26 0 0);
+  --sidebar-ring: oklch(0.795 0.148 86);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: 'ss01';
+  }
+  /* شريط تمرير أنيق */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: oklch(0.35 0 0);
+    border-radius: 8px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: oklch(0.45 0 0);
+  }
+}
+
+/* أرقام لاتينية للجداول المالية */
+.num {
+  font-variant-numeric: tabular-nums;
+  direction: ltr;
+  unicode-bidi: embed;
+}
+
+/* توسيط النوافذ المنبثقة داخل منطقة المحتوى (بعد الشريط الجانبي) لا فوقه.
+   --sidebar-w = 0 على الجوال (الشريط مخفي Sheet) و240/68px على الشاشات الكبيرة
+   حسب حالة الطي — يُحدَّث من app-sidebar عبر المتغير --sidebar-w-desktop */
+:root {
+  --sidebar-w: 0px;
+}
+@media (min-width: 1024px) {
+  :root {
+    --sidebar-w: var(--sidebar-w-desktop, 240px);
+  }
+  /* توسيط هندسي صحيح لكل نوافذ النظام: منتصف منطقة المحتوى الفعلية خلف الشريط الجانبي.
+     الصيغة القديمة calc((100vw - var(--sidebar-w)) / 2) كانت تحسب المنتصف من حافة الشاشة
+     نفسها فتنحرف كل النوافذ نصف عرض الشريط (120px) عن مركزها الصحيح — والصحيح أن يُزاح
+     المركز بمقدار الشريط كاملاً أولاً (sidebar-w) ثم يُؤخذ نصف مساحة المحتوى المتبقية.
+     تشمل القاعدة نوافذ الحوار Dialog ونوافذ التأكيد AlertDialog معاً (Task 54) */
+  [data-slot='dialog-content'],
+  [data-slot='alert-dialog-content'] {
+    left: calc(var(--sidebar-w) + (100vw - var(--sidebar-w)) / 2);
+  }
+}
+
+/* ==================== نظام الطباعة الموحد — «اطبع المنطقة المحددة فقط» ====================
+   الاستخدام: ضع class="print-area" على حاوية (رأس الطباعة + الجدول + الإجماليات)
+   و class="no-print" على أشرطة الأدوات/الفلاتر/التقسيم/أعمدة الإجراءات.
+   رأس الطباعة المشترك .print-header يظهر فقط في المعاينة الورقية. */
+
+/* رأس الطباعة المشترك — مخفي على الشاشة تماماً */
+.print-header {
+  display: none;
+}
+
+@page {
+  size: A4;
+  /* هامش صفر يلغي ترويسة المتصفح التلقائية (عنوان الصفحة + تاريخ/وقت الطباعة)
+     التي كانت تُظهر التاريخ مرتين — الهوامش تُعوَّض بحشو داخلي لمنطقة الطباعة */
+  margin: 0;
+}
+
+@media print {
+  /* ورق أبيض دائماً — حتى مسار Ctrl+P لا يُظهر خلفية الثيم الليلي حول منطقة الطباعة */
+  html {
+    background: #ffffff !important;
+    color-scheme: light !important;
+  }
+  body {
+    background: #ffffff !important;
+  }
+  /* إخفاء كل شيء ثم إظهار منطقة الطباعة وحدها */
+  body * {
+    visibility: hidden;
+  }
+  .print-area,
+  .print-area * {
+    visibility: visible;
+  }
+  .print-area {
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline-start: 0;
+    width: 100%;
+    /* هوامش الورقة داخلية بدل هوامش @page — إخفاءً لترويسة المتصفح
+       الهامش العلوي بأدنى حد (4mm) بطلب المستخدم — والجانبان والأسفل مريحان */
+    padding: 4mm 10mm 10mm;
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+  .print-area * {
+    color: #000000 !important;
+    background: transparent !important;
+    border-color: #c8c8c8 !important; /* حدود رمادية محايدة بدل ألوان الثيم */
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+  .print-area table,
+  .print-area th,
+  .print-area td {
+    border-color: #c8c8c8 !important;
+  }
+
+  /* عناصر تفاعلية وأشرطة أدوات لا تُطبع إطلاقاً */
+  .no-print {
+    display: none !important;
+  }
+
+  /* رأس الطباعة المشترك — أسود على أبيض بحد سفلي واضح */
+  .print-header {
+    display: block;
+    font-family: var(--font-cairo), 'Cairo', sans-serif;
+    color: #000000 !important;
+    background: #ffffff !important;
+    border-bottom: 2px solid #000000;
+    padding-bottom: 10px;
+    margin-bottom: 14px;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* الجدول يلتف على عرض الورقة — بلا تمرير ولا قص ولا ارتفاع أقصى */
+  .print-area table {
+    min-width: 0 !important;
+    width: 100% !important;
+  }
+  /* أرضيات min-width التي تحملها كلاسات الشاشة (min-w-48 وأخواتها) تقاوم انكماش الأعمدة
+     على الورق فيُفيض الجدول عن عرض A4 الفعلي وتُقص الأعمدة الأخيرة عند الحافة (لاحظها
+     المستخدم بعمود «السبب / البيان» و«المصدر»). الطباعة تُلغي الأرضيات كي يلتزم الجدول
+     عرض الورقة 100% فعلاً وينكمش كل عمود بحرية إلى التفاف الكلمات الطبيعي — دون كسر
+     الكلمات العربية حرفاً بحرف (anywhere يُحصر بالأعمدة النصية التي تطلبه صراحة) —
+     لا أثر لهذا على الشاشة إطلاقاً */
+  .print-area th,
+  .print-area td {
+    min-width: 0 !important;
+  }
+  .print-area thead {
+    position: static !important;
+  }
+  .print-area [class*='overflow'],
+  .print-area [class*='max-h'] {
+    overflow: visible !important;
+    max-height: none !important;
+  }
+
+  /* كلمات وأرقام كاملة — إلغاء البتر (…) والقص والحدود القصوى داخل منطقة الطباعة */
+  .print-area *,
+  .print-area *::before,
+  .print-area *::after {
+    white-space: normal !important;
+    text-overflow: clip !important;
+    max-width: none !important;
+    overflow: visible !important;
+  }
+  /* المبالغ والتواريخ تبقى سطراً واحداً — لا تلتف وسط الرقم.
+     تنبيه: كان هذا الاستثناء يشمل أيضاً td[class*='whitespace-nowrap'] — لكن هذا
+     الكلاس افتراضي على كل TableCell في التطبيق (src/components/ui/table.tsx) بلا
+     استثناء، فكانت القاعدة تُطبَّق فعلياً على كل خلية نصية لا الأرقام فقط، فتفيض
+     النصوص الطويلة (أسماء أطراف، بيانات، شارات حالة بسطرين) أفقياً فوق العمود
+     المجاور بدل النزول لسطر ثانٍ — وهذا هو سبب «التداخل» المُبلَّغ عنه في كل
+     التقارير المطبوعة. الاستثناء الآن مقصور على .num فعلياً كما يوحي التعليق */
+  .print-area .num {
+    white-space: nowrap !important;
+  }
+  /* موضع العملة في الطباعة = موضعها على الشاشة تماماً:
+     قبل الطباعة تُزال محارف الاتجاه الخفية (RLE/PDF) من نصوص منطقة الطباعة،
+     وعنصر .num ثابت الاتجاه ltr فينقلب ترتيب «100,000 ل.س» فيظهر رمز العملة
+     قبل العدد. الحل: unicode-bidi: plaintext يستنتج اتجاه كل عنصر من أول
+     محرف قوي — «100,000 ل.س» يبدأ بحرف عربي فيُعرض بالعدد أولاً والعملة بعده،
+     والأكواد اللاتينية «VCH-0009» والتواريخ تبقى LTR دون انقلاب. */
+  .print-area .num {
+    unicode-bidi: plaintext !important;
+  }
+  /* كثافة ورقية مريحة — خط أصغر قليلاً وحشو أضيق يستوعب كل الأعمدة */
+  .print-area table {
+    font-size: 11px !important;
+  }
+  .print-area th,
+  .print-area td {
+    padding: 4px 6px !important;
+  }
+
+  /* وضع الطباعة النشط (يضيفه زر الطباعة على <html>):
+     التطبيق كله يختفي تخطيطياً وتبقى منطقة الطباعة وحدها ابناً مباشراً للجذر
+     — بعرض الورقة تماماً وبلا صفحات فارغة زائدة بعد المحتوى */
+  html.printing body > *:not(.print-area) {
+    display: none !important;
+  }
+  html.printing body {
+    background: #ffffff !important;
+  }
+  html.printing .print-area {
+    position: static !important;
+    width: auto !important;
+    inset: auto !important;
+  }
+
+  /* صور المواد في الجداول تُخفى عند الطباعة — الصورة الأساسية للعرض فقط */
+  table img {
+    display: none !important;
+  }
+}
+

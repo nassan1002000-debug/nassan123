@@ -1,0 +1,88 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files (can opt-in for committing if needed)
+.env*
+
+# vercel
+.vercel
+
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+local-*
+.claude
+.z-ai-config
+*.log
+dev.log
+dev.out.log
+test
+prompt
+
+server.log
+# Skills directory
+/skills/
+# أسرار النظام والبيانات الحية — تُمنع من التتبع نهائياً (مرحلة صفر P0-1 + المرحلة الأولى P1)
+db/custom.db
+db/*.db
+db/*.db-*
+db/**/*.db
+db/**/*.db-*
+db/periods/
+prisma/*.db
+prisma/*.db-*
+prisma/*.bak
+db/auth-secret.txt
+db/restore-pending.txt
+db/backups/
+uploads/
+reports/assets/
+
+# حزمة النسخ الاحتياطي الشامل — تُولَّد عند الطلب ولا تُتتبع (نُقلت إلى db/archive في Task 25)
+public/amal2026-full-backup.zip
+db/archive/
+
+# مسار النسخ الاحتياطي المخصص الذي يختاره المدير من الإعدادات (backupCustomDir) — قد يقع
+# خارج db/ فلا تغطيه القواعد أعلاه؛ بيانات ثنائية حية لا تُتتبع أبداً كباقي مجلدات النسخ
+/النسخ الاحتياطية/
+
+# مسار حفظ نسخة إضافية من الأرشيف الذي يختاره المدير عند إقفال الفترة (archivePath —
+# resolveArchiveCopyDir) — نفس منطق backupCustomDir أعلاه: قد يقع خارج db/ فلا تغطيه
+# قاعدة db/periods/؛ بيانات ثنائية حية لا تُتتبع أبداً
+/الفترات المحاسبية السابقة/
+
+# النسخة الذهبية للإصدار النهائي — تُولَّد عند الطلب ولا تُتتبع (Task 12: v1.0-Production-Ready)
+public/golden-v1.0-production-ready.zip
+
+# مخلفات أدوات الجلسات — تتجدد تلقائياً
+tool-results/
